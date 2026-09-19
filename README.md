@@ -42,9 +42,9 @@ uv run python -c "import pandas as pd; print(len(pd.read_csv('data/exports/video
 
 **Act 1 — The documentation lied.** The dataset's `time_frame` column is documented as "how long the video trended for". Three pieces of evidence prove it's actually the video's publish hour (UTC), not a duration. Full write-up in [`docs/data-quality-report.md`](docs/data-quality-report.md); every query re-run live with real outputs in [`notebooks/01-data-quality-audit.ipynb`](notebooks/01-data-quality-audit.ipynb).
 
-**Act 2 — Rebuilding metrics from raw event rows.** Two data invariants isolate 1,799 + 72 corrupted rows and dedupe 222 duplicate-scrape rows. A three-layer table (`raw` → `video_life` → `channel`) is built in SQL and independently re-verified in pandas. Core finding: the four countries are two entirely different mechanisms.
+**Act 2 — Rebuilding metrics from raw event rows.** Two data invariants isolate 1,799 + 72 corrupted rows and dedupe 222 duplicate-scrape rows. A three-layer table (`raw` → `video_life` → `channel`) is built in SQL ([`sql/`](sql/), [`notebooks/02-metric-tables.ipynb`](notebooks/02-metric-tables.ipynb)) and independently re-verified in pandas ([`notebooks/03-pandas-reconciliation.ipynb`](notebooks/03-pandas-reconciliation.ipynb)). Core finding: the four countries are two entirely different mechanisms.
 
-**Act 3 — From observation to experiment.** A per-country two-proportion z-test (with Newcombe confidence intervals) checks whether Friday publishing improves multi-day retention. Three of four markets show a consistent positive effect; an experiment proposal (randomization unit, primary/guardrail metrics, sample size) is designed for the two markets where it matters.
+**Act 3 — From observation to experiment.** A per-country two-proportion z-test (with Newcombe confidence intervals) checks whether Friday publishing improves multi-day retention, cross-checked with a bootstrap and a logistic regression controlling for country ([`notebooks/04-hypothesis-test.ipynb`](notebooks/04-hypothesis-test.ipynb)). Three of four markets show a consistent positive effect; a full experiment proposal (randomization unit, primary/guardrail metrics, sample size) is in [`docs/experiment-proposal.md`](docs/experiment-proposal.md).
 
 ## Dashboard
 
