@@ -46,6 +46,12 @@ uv run python -c "import pandas as pd; print(len(pd.read_csv('data/exports/video
 
 **Act 3 — From observation to experiment.** A per-country two-proportion z-test (with Newcombe confidence intervals) checks whether Friday publishing improves multi-day retention, cross-checked with a bootstrap and a logistic regression controlling for country ([`notebooks/04-hypothesis-test.ipynb`](notebooks/04-hypothesis-test.ipynb)). Three of four markets show a consistent positive effect; a full experiment proposal (randomization unit, primary/guardrail metrics, sample size) is in [`docs/experiment-proposal.md`](docs/experiment-proposal.md).
 
+## For a non-technical reader
+
+- [`docs/memo.md`](docs/memo.md) — the whole project in three short paragraphs: finding, recommendation, why an experiment is needed
+- [`docs/memo-variants.md`](docs/memo-variants.md) — the same finding rewritten for a PM, for operations, and for engineering — each answering a different question, not just reworded
+- [`docs/what-data-cannot-answer.md`](docs/what-data-cannot-answer.md) — three honest limitations: cold start, causality, and subscriber/watch-time data
+
 ## Dashboard
 
 [Tableau Public link — coming soon]
