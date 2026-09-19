@@ -40,7 +40,7 @@ uv run duckdb -c "SELECT COUNT(*) FROM 'data/exports/video_life.csv'"
 
 ## The story, in three acts
 
-**Act 1 — The documentation lied.** The dataset's `time_frame` column is documented as "how long the video trended for". Three pieces of evidence prove it's actually the video's publish hour (UTC), not a duration. See [`docs/data-quality-report.md`](docs/data-quality-report.md).
+**Act 1 — The documentation lied.** The dataset's `time_frame` column is documented as "how long the video trended for". Three pieces of evidence prove it's actually the video's publish hour (UTC), not a duration. Full write-up in [`docs/data-quality-report.md`](docs/data-quality-report.md); every query re-run live with real outputs in [`notebooks/01-data-quality-audit.ipynb`](notebooks/01-data-quality-audit.ipynb).
 
 **Act 2 — Rebuilding metrics from raw event rows.** Two data invariants isolate 1,799 + 72 corrupted rows and dedupe 222 duplicate-scrape rows. A three-layer table (`raw` → `video_life` → `channel`) is built in SQL and independently re-verified in pandas. Core finding: the four countries are two entirely different mechanisms.
 
