@@ -1,0 +1,17 @@
+[project]
+name = "trending-longevity-tracker"
+version = "0.1.0"
+description = "Rebuilding trending-longevity metrics from raw YouTube trending snapshots, and designing an A/B test for a Friday-publishing hypothesis."
+requires-python = ">=3.12"
+dependencies = [
+    "duckdb>=1.5",
+    "pandas>=2.2",
+    "matplotlib>=3.9",
+    "seaborn>=0.13",
+    "scipy>=1.13",
+    "statsmodels>=0.14",
+    "jupyter>=1.0",
+]
+
+[tool.uv]
+package = false

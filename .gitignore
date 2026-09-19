@@ -1,0 +1,17 @@
+# Raw dataset — large file, download from Kaggle instead of committing
+# (thedevastator/youtube-trending-videos-dataset)
+data/youtube.csv
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+# Local exports that can be regenerated
+data/exports/*.csv
