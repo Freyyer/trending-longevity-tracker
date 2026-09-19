@@ -22,8 +22,8 @@ uv sync
 # 3. Run the pipeline
 uv run python src/build_tables.py
 
-# 4. Verify
-uv run duckdb -c "SELECT COUNT(*) FROM 'data/exports/video_life.csv'"
+# 4. Verify (build_tables.py already prints row counts, but to check independently)
+uv run python -c "import pandas as pd; print(len(pd.read_csv('data/exports/video_life.csv')))"
 # expect 63,783
 ```
 
