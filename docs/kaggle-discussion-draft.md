@@ -1,14 +1,15 @@
-# Kaggle Discussion 纠错帖草稿
+# Kaggle Discussion Post — Draft
 
-> ⚠️ 这是草稿，需要你自己登录 Kaggle 账号，在
+> ⚠️ This is a draft. You need to log into your own Kaggle account and post
+> it at
 > https://www.kaggle.com/datasets/thedevastator/youtube-trending-videos-dataset/discussion
-> 发布。发布后把公开 URL 记录在这个文件末尾。
+> After posting, record the public URL at the bottom of this file.
 
 ---
 
-**标题**：`time_frame` column is publish hour (UTC), not "video's trending duration"
+**Title**: `time_frame` column is publish hour (UTC), not "video's trending duration"
 
-**正文**：
+**Body**:
 
 The dataset description says `time_frame` represents "the video's time frame in the trending list" (i.e. duration). After analysis, I believe this is incorrect — `time_frame` actually represents the video's **publish hour in UTC**, not a duration. Three pieces of evidence:
 
@@ -42,12 +43,12 @@ GROUP BY video_id ORDER BY days DESC LIMIT 5;
 
 Given the two adjacent columns `publish_date` and `published_day_of_week`, I believe `time_frame` completes a "publish date, publish weekday, publish hour (UTC)" triple, all describing when the video was first published — not anything about the trending list duration.
 
-Happy to be corrected if I'm missing context about how this field was originally generated. Full analysis (including a data quality report covering other issues in this dataset — duplicate IDs, a corrupted `#NAME?` video_id, and 8 days of missing scrape data) is here: [链接到你的 GitHub 仓库，仓库建好后补上]
+Happy to be corrected if I'm missing context about how this field was originally generated. Full analysis (including a data quality report covering other issues in this dataset — duplicate IDs, a corrupted `#NAME?` video_id, and 8 days of missing scrape data) is here: https://github.com/Freyyer/trending-longevity-tracker
 
 ---
 
-## 发布后请在这里记录
+## Post-publication log
 
-- 发布日期：
-- 公开 URL：
-- 是否有人回复：
+- Publish date:
+- Public URL:
+- Any replies:

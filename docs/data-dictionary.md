@@ -1,164 +1,164 @@
-# 数据字典：YouTube Trending Videos Dataset
+# Data Dictionary: YouTube Trending Videos Dataset
 
-**数据源**：Kaggle `thedevastator/youtube-trending-videos-dataset`，`youtube.csv`
-**粒度**：一行 = 一个视频在一个国家的某一天上了热搜榜（事件粒度 event grain）
-**唯一键（清洗后）**：`(video_id, publish_country, trend_dt)`
+**Source**: Kaggle `thedevastator/youtube-trending-videos-dataset`, `youtube.csv`
+**Grain**: one row = one video, one country, one day it appeared on the trending list (event grain)
+**Unique key (after cleaning)**: `(video_id, publish_country, trend_dt)`
 
-18 个字段，每个字段列出：真实含义、类型、取值范围、验证 SQL、与 Kaggle 官方说明的差异。
+18 fields, each with: true meaning, type, value range, verification SQL, and how it differs from the official Kaggle description.
 
 ---
 
 ## 1. `index`
 
-- **真实含义**：行序号，DuckDB 导入 CSV 时的行号，从 0 开始
-- **类型**：BIGINT
-- **取值范围**：0 到 161,469（等于总行数 - 1）
-- **验证 SQL**：`SELECT COUNT(DISTINCT index) FROM raw` → 应等于总行数 161,470
-- **与官方说明差异**：无特别说明，行为符合预期
+- **True meaning**: row sequence number, assigned by DuckDB on CSV import, starting at 0
+- **Type**: BIGINT
+- **Value range**: 0 to 161,469 (total rows - 1)
+- **Verification SQL**: `SELECT COUNT(DISTINCT index) FROM raw` → should equal 161,470
+- **Difference from official description**: none, behaves as expected
 
 ## 2. `video_id`
 
-- **真实含义**：YouTube 视频 ID，理论上是主键的一部分
-- **类型**：VARCHAR
-- **取值范围**：55,886 个 distinct 值（含 `#NAME?`）
-- **验证 SQL**：`SELECT COUNT(*) FROM raw WHERE video_id = '#NAME?'` → 1,799
-- **与官方说明差异**：**存在已知坏值 `#NAME?`**（Excel 把以 `-`/`=` 开头的 ID 当公式处理后留下的错误值），代表几百个不同视频挤在一起，必须整体隔离，不能信任
+- **True meaning**: YouTube video ID, intended as part of the primary key
+- **Type**: VARCHAR
+- **Value range**: 55,886 distinct values (including `#NAME?`)
+- **Verification SQL**: `SELECT COUNT(*) FROM raw WHERE video_id = '#NAME?'` → 1,799
+- **Difference from official description**: **a known corrupted value, `#NAME?`**, exists (the error Excel produces when a video_id starting with `-`/`=` is parsed as a formula). It represents hundreds of different videos crammed together and must be isolated entirely — it cannot be trusted
 
 ## 3. `trending_date`
 
-- **真实含义**：这一行快照对应的日期，格式是 `YY.DD.MM`（年.日.月，不是常见的年.月.日）
-- **类型**：VARCHAR（⚠️ **不是 DATE**，DuckDB `read_csv_auto` 认不出这个非标准格式，会当字符串处理）
-- **取值范围**：`17.01.12`（2017-12-01）到 `18.31.05`（2018-05-31），205 个 distinct 值
-- **验证 SQL**：`SELECT strptime(trending_date, '%y.%d.%m')::DATE FROM raw LIMIT 5` 确认能正确转换
-- **与官方说明差异**：**格式陷阱**。必须显式用 `strptime(trending_date, '%y.%d.%m')::DATE` 转换成真正的日期类型，否则所有涉及日期比较、排序、窗口函数的查询都会出错或给出误导性结果（字符串排序和日期排序不一致）
+- **True meaning**: the date this snapshot row corresponds to, formatted `YY.DD.MM` (year.day.month — not the more common year.month.day)
+- **Type**: VARCHAR (⚠️ **not DATE** — DuckDB's `read_csv_auto` can't infer this non-standard format and treats it as a string)
+- **Value range**: `17.01.12` (2017-12-01) to `18.31.05` (2018-05-31), 205 distinct values
+- **Verification SQL**: `SELECT strptime(trending_date, '%y.%d.%m')::DATE FROM raw LIMIT 5` to confirm correct parsing
+- **Difference from official description**: **format gotcha**. Must explicitly cast with `strptime(trending_date, '%y.%d.%m')::DATE`, otherwise any query involving date comparison, sorting, or window functions will be wrong or misleading (string sort order doesn't match date order)
 
 ## 4. `title`
 
-- **真实含义**：视频标题快照（不是恒定属性，同一视频改标题后新标题会出现在后续行）
-- **类型**：VARCHAR
-- **取值范围**：56,905 个 distinct 值，含大量 emoji 和多语言字符（部分显示为乱码，是 CSV 编码问题）
-- **验证 SQL**：`SELECT COUNT(*) FROM (SELECT video_id FROM clean GROUP BY 1 HAVING COUNT(DISTINCT title)>1)` → 538 个视频改过标题
-- **与官方说明差异**：官方未强调这是"跨行可变"的属性列，取值时应用 `ARG_MAX(title, trend_dt)` 取末次快照，不能用 `ANY_VALUE`
+- **True meaning**: a snapshot of the video title (not a constant attribute — a title change will appear in later rows as new text)
+- **Type**: VARCHAR
+- **Value range**: 56,905 distinct values, with heavy emoji and multilingual usage (some render as mojibake — a CSV encoding artifact)
+- **Verification SQL**: `SELECT COUNT(*) FROM (SELECT video_id FROM clean GROUP BY 1 HAVING COUNT(DISTINCT title)>1)` → 538 videos changed title
+- **Difference from official description**: the official docs don't flag this as a "drifts across rows" attribute — it should be pulled with `ARG_MAX(title, trend_dt)` (latest snapshot), not `ANY_VALUE`
 
 ## 5. `channel_title`
 
-- **真实含义**：发布该视频的频道名称快照（同样跨行可变，会因改名而不同）
-- **类型**：VARCHAR
-- **取值范围**：原始表 12,361 个 distinct 值；⚠️ **不是主键**，数据集没有 `channel_id`，只能按标题分组，52-53 组标题仅大小写或空格不同会被误判为不同频道
-- **验证 SQL**：`SELECT COUNT(*) FROM (SELECT video_id FROM clean GROUP BY 1 HAVING COUNT(DISTINCT channel_title)>1)` → 55 个视频改过频道名
-- **与官方说明差异**：Kaggle 页面容易让人误以为 `channel_title` 可以当频道的唯一标识，**实际上不行**——55 个视频改过频道名，52-53 组标题因大小写/空格差异被误判成不同频道。这是频道级分析的已知缺陷，写进局限里
+- **True meaning**: a snapshot of the publishing channel's name (also drifts across rows if the channel is renamed)
+- **Type**: VARCHAR
+- **Value range**: 12,361 distinct values in the raw table; ⚠️ **not a primary key** — the dataset has no `channel_id`, so grouping is by title alone, and 52-53 groups differing only by case or whitespace get mis-split into separate "channels"
+- **Verification SQL**: `SELECT COUNT(*) FROM (SELECT video_id FROM clean GROUP BY 1 HAVING COUNT(DISTINCT channel_title)>1)` → 55 videos changed channel name
+- **Difference from official description**: it's easy to assume `channel_title` can serve as a unique channel identifier — **it cannot**. 55 videos changed channel names mid-trending, and 52-53 groups get double-counted due to case/whitespace variants. This is a known limitation for any channel-level analysis, documented rather than fixed in this project
 
 ## 6. `category_id`
 
-- **真实含义**：YouTube 视频品类的数字编码
-- **类型**：BIGINT
-- **取值范围**：18 个整数（1 到 44 之间，不连续），**无对应的名称映射**
-- **验证 SQL**：`SELECT DISTINCT category_id FROM raw ORDER BY 1` → 18 行
-- **与官方说明差异**：本数据集**不带**品类名称映射表。真实的 ID→名称映射来自上游 `datasnaek` 系列数据集里的 `*_category_id.json` 文件（YouTube API 的标准品类表），需要单独下载补充；不能凭空猜测数字对应的品类名
+- **True meaning**: a numeric code for the YouTube video category
+- **Type**: BIGINT
+- **Value range**: 18 integers (between 1 and 44, non-contiguous), **with no accompanying name mapping**
+- **Verification SQL**: `SELECT DISTINCT category_id FROM raw ORDER BY 1` → 18 rows
+- **Difference from official description**: this dataset does **not** ship a category-name lookup. The real ID→name mapping comes from the upstream `datasnaek` family of datasets' `*_category_id.json` files (YouTube's standard category table) and would need to be downloaded separately — the numeric codes should not be guessed
 
 ## 7. `publish_date`
 
-- **真实含义**：视频最初发布的日期（属性列，不随抓取变化）
-- **类型**：DATE（这一列 DuckDB 能正确识别）
-- **取值范围**：2006-07-23 到 2018-06-14，471 个 distinct 值
-- **验证 SQL**：`SELECT video_id FROM raw WHERE video_id<>'#NAME?' GROUP BY 1 HAVING COUNT(DISTINCT publish_date)>1` → 11 个 ID 违反"发布日期应恒定"
-- **与官方说明差异**：无字段含义争议，但是不变量 2 的关键列——11 个 video_id 的 `publish_date` 跨行不恒定，是发布属性不干净的信号
+- **True meaning**: the date the video was originally published (an attribute column, constant across the scrape)
+- **Type**: DATE (this column is correctly inferred by DuckDB)
+- **Value range**: 2006-07-23 to 2018-06-14, 471 distinct values
+- **Verification SQL**: `SELECT video_id FROM raw WHERE video_id<>'#NAME?' GROUP BY 1 HAVING COUNT(DISTINCT publish_date)>1` → 11 IDs violate "publish date should be constant"
+- **Difference from official description**: no dispute over meaning, but this is the key column for Invariant 2 — 11 video_ids have an inconsistent `publish_date` across rows, a signal the publish attributes for those IDs are unreliable
 
 ## 8. `time_frame`
 
-- **真实含义**：视频的 **UTC 发布钟点**（比如 `17:00 to 17:59` 表示 UTC 17 点发布），是"发布时刻"不是"持续时长"
-- **类型**：VARCHAR
-- **取值范围**：24 个整点区间取值，从 `0:00 to 0:59` 到 `23:00 to 23:59`
-- **验证 SQL**：见 `sql/00-invariants.sql` 证据 1-3
-- **与官方说明差异**：**Kaggle 官方描述为"视频热搜的时间长短"，这是错的**。三条证据（只有 24 个整点取值、同一视频跨行不变、US 榜 `time_frame='0:00 to 0:59'` 却有连续上榜 22 天的反例）证明它是发布钟点，不是时长。本项目的所有分析文档都已改用 `pub_hour_utc` 这个更准确的别名
+- **True meaning**: the video's **publish hour in UTC** (e.g. `17:00 to 17:59` means published at UTC hour 17) — a publish *moment*, not a duration
+- **Type**: VARCHAR
+- **Value range**: 24 clock-hour bins, from `0:00 to 0:59` to `23:00 to 23:59`
+- **Verification SQL**: see `sql/00-invariants.sql`, Evidence 1-3
+- **Difference from official description**: **the Kaggle page describes it as "how long the video trended for" — this is wrong**. Three pieces of evidence (only 24 clock-hour values, constant across rows for a given video, and a US video with `time_frame='0:00 to 0:59'` that trended for 22 consecutive days) prove it's a publish hour, not a duration. All analysis in this project uses the clearer alias `pub_hour_utc`
 
 ## 9. `published_day_of_week`
 
-- **真实含义**：`publish_date` 对应的星期几（冗余列，可以从 `publish_date` 推导，但直接读省事）
-- **类型**：VARCHAR
-- **取值范围**：7 个值（Monday 到 Sunday）
-- **验证 SQL**：`SELECT published_day_of_week, DAYNAME(publish_date) FROM raw LIMIT 5` 交叉验证两者是否一致
-- **与官方说明差异**：无差异，是本项目 POC-03 假设检验的关键分组字段（周五 vs 非周五）
+- **True meaning**: the day of the week corresponding to `publish_date` (a redundant column — could be derived from `publish_date`, but reading it directly saves the derivation)
+- **Type**: VARCHAR
+- **Value range**: 7 values (Monday through Sunday)
+- **Verification SQL**: `SELECT published_day_of_week, DAYNAME(publish_date) FROM raw LIMIT 5` cross-checks the two agree
+- **Difference from official description**: none — this is the key grouping field for the Friday-vs-non-Friday hypothesis test
 
 ## 10. `publish_country`
 
-- **真实含义**：这一行快照来自哪个国家的热搜榜
-- **类型**：VARCHAR
-- **取值范围**：4 个值（US, CANADA, FRANCE, GB）
-- **验证 SQL**：`SELECT DISTINCT publish_country FROM raw` → 4 行
-- **与官方说明差异**：无差异，是本项目最核心的分层维度——四国是两种完全不同的榜单机制（一日游占比 59-75% vs 7-11%）
+- **True meaning**: which country's trending list this snapshot row came from
+- **Type**: VARCHAR
+- **Value range**: 4 values (US, CANADA, FRANCE, GB)
+- **Verification SQL**: `SELECT DISTINCT publish_country FROM raw` → 4 rows
+- **Difference from official description**: none — this is the core stratification dimension for this project: the four countries run on two entirely different trending-list mechanisms (one-day-only share 59-75% vs. 7-11%)
 
 ## 11. `tags`
 
-- **真实含义**：视频标签，用 `"` 分隔的字符串拼接（不是标准 JSON 数组）
-- **类型**：VARCHAR
-- **取值范围**：50,239 个 distinct 组合，含多语言和特殊字符
-- **验证 SQL**：`SELECT tags FROM raw LIMIT 3` 观察实际格式
-- **与官方说明差异**：本项目 In Scope 未使用这一列做正式分析，仅作为已知字段列入字典
+- **True meaning**: video tags, concatenated with `"` as a separator (not a standard JSON array)
+- **Type**: VARCHAR
+- **Value range**: 50,239 distinct combinations, with multilingual and special characters
+- **Verification SQL**: `SELECT tags FROM raw LIMIT 3` to inspect the actual format
+- **Difference from official description**: not used in formal analysis for this project; listed here as a known field for completeness
 
 ## 12. `views`
 
-- **真实含义**：这一行快照时刻的累计观看数
-- **类型**：BIGINT
-- **取值范围**：223 到 424,538,912
-- **验证 SQL**：`SELECT COUNT(*) FROM (SELECT views, LAG(views) OVER (...) AS prev FROM clean) WHERE views < prev` → 100 行倒退
-- **与官方说明差异**：无字段含义争议，但有 **100 行倒退**（比前一日快照小），是上游快照顺序或缓存问题，不是视频真的"掉观看数"
+- **True meaning**: cumulative view count at the moment of this snapshot
+- **Type**: BIGINT
+- **Value range**: 223 to 424,538,912
+- **Verification SQL**: `SELECT COUNT(*) FROM (SELECT views, LAG(views) OVER (...) AS prev FROM clean) WHERE views < prev` → 100 regressed rows
+- **Difference from official description**: no dispute over meaning, but there are **100 regressed rows** (smaller than the previous day's snapshot) — an upstream snapshot-ordering or caching artifact, not a video actually "losing" views
 
 ## 13. `likes`
 
-- **真实含义**：这一行快照时刻的累计点赞数
-- **类型**：BIGINT
-- **取值范围**：0 到 5,613,827
-- **验证 SQL**：无单独验证，配合 `views` 用于去重排序（`ORDER BY views DESC, likes DESC`）
-- **与官方说明差异**：无
+- **True meaning**: cumulative like count at the moment of this snapshot
+- **Type**: BIGINT
+- **Value range**: 0 to 5,613,827
+- **Verification SQL**: none standalone; used alongside `views` as a tiebreaker for dedup sort order (`ORDER BY views DESC, likes DESC`)
+- **Difference from official description**: none
 
 ## 14. `dislikes`
 
-- **真实含义**：这一行快照时刻的累计点踩数
-- **类型**：BIGINT
-- **取值范围**：0 到 1,944,971
-- **验证 SQL**：无
-- **与官方说明差异**：无，本项目未使用这一列做核心指标
+- **True meaning**: cumulative dislike count at the moment of this snapshot
+- **Type**: BIGINT
+- **Value range**: 0 to 1,944,971
+- **Verification SQL**: none
+- **Difference from official description**: none; not used as a core metric in this project
 
 ## 15. `comment_count`
 
-- **真实含义**：这一行快照时刻的累计评论数
-- **类型**：BIGINT
-- **取值范围**：0 到 1,626,501
-- **验证 SQL**：无
-- **与官方说明差异**：无
+- **True meaning**: cumulative comment count at the moment of this snapshot
+- **Type**: BIGINT
+- **Value range**: 0 to 1,626,501
+- **Verification SQL**: none
+- **Difference from official description**: none
 
 ## 16. `comments_disabled`
 
-- **真实含义**：该视频是否关闭了评论
-- **类型**：BOOLEAN
-- **取值范围**：True / False
-- **验证 SQL**：`SELECT comments_disabled, COUNT(*) FROM raw GROUP BY 1`
-- **与官方说明差异**：无，是运营可执行建议候选之一（"是否关评论"，见 case §二映射表）
+- **True meaning**: whether comments were disabled for this video
+- **Type**: BOOLEAN
+- **Value range**: True / False
+- **Verification SQL**: `SELECT comments_disabled, COUNT(*) FROM raw GROUP BY 1`
+- **Difference from official description**: none; a candidate actionable lever for operations (whether to disable comments)
 
 ## 17. `ratings_disabled`
 
-- **真实含义**：该视频是否关闭了点赞/点踩功能
-- **类型**：BOOLEAN
-- **取值范围**：True / False
-- **验证 SQL**：`SELECT ratings_disabled, COUNT(*) FROM raw GROUP BY 1`
-- **与官方说明差异**：无
+- **True meaning**: whether likes/dislikes were disabled for this video
+- **Type**: BOOLEAN
+- **Value range**: True / False
+- **Verification SQL**: `SELECT ratings_disabled, COUNT(*) FROM raw GROUP BY 1`
+- **Difference from official description**: none
 
 ## 18. `video_error_or_removed`
 
-- **真实含义**：该视频在抓取时是否报错或已被删除
-- **类型**：BOOLEAN
-- **取值范围**：True / False，126 行为 True（清洗后）
-- **验证 SQL**：`SELECT COUNT(*) FROM clean WHERE video_error_or_removed = True` → 126
-- **与官方说明差异**：无字段含义争议，但**计算留存/寿命类指标时需要考虑是否剔除这 126 行**，因为它们的 `views` 等指标可能已经失真（视频被删后快照仍残留）
+- **True meaning**: whether the video errored out or had been removed at scrape time
+- **Type**: BOOLEAN
+- **Value range**: True / False, 126 rows True (on cleaned data)
+- **Verification SQL**: `SELECT COUNT(*) FROM clean WHERE video_error_or_removed = True` → 126
+- **Difference from official description**: no dispute over meaning, but **these 126 rows need consideration when computing retention/lifespan metrics**, since their `views` and other fields may already be stale by the time the video was deleted
 
 ---
 
-## 已知的两个结构性缺陷（不在本项目内修复，但必须写清楚）
+## Two known structural limitations (not fixed within this project, but documented explicitly)
 
-1. **`category_id` 没有名称映射**：本数据集不带，需要从上游 `datasnaek` 系列数据集的 `*_category_id.json` 单独下载
-2. **`channel_title` 不是主键**：数据集没有 `channel_id`，52-53 组标题仅因大小写/空格不同就被误判为不同频道；另有 55 个视频在榜期间改过频道名，按末次快照归到最后的名字下，早期上榜记录会"转移"给新名字
+1. **No `category_id` name mapping**: not shipped with this dataset; would need to be downloaded separately from the upstream `datasnaek` family of datasets' `*_category_id.json`
+2. **`channel_title` is not a primary key**: the dataset has no `channel_id`; 52-53 groups of titles differing only by case/whitespace get mis-split into separate channels, and 55 videos changed channel names mid-trending (attributed to the latest snapshot's name, meaning early trending records "transfer" to the new name)
 
 ---
 
-**产出**：本字典 + `docs/data-quality-report.md` + `sql/00-invariants.sql`
+**Deliverables**: this dictionary + `docs/data-quality-report.md` + `sql/00-invariants.sql`

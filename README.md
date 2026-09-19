@@ -48,7 +48,7 @@ uv run duckdb -c "SELECT COUNT(*) FROM 'data/exports/video_life.csv'"
 
 ## Dashboard
 
-[Tableau Public link — coming after POC-06]
+[Tableau Public link — coming soon]
 
 ## Honest disclosures
 

@@ -1,92 +1,92 @@
-# 数据质量报告：YouTube Trending Videos Dataset
+# Data Quality Report: YouTube Trending Videos Dataset
 
-**数据源**：Kaggle `thedevastator/youtube-trending-videos-dataset`，`youtube.csv`（161,470 行，18 列，四国 US/CANADA/FRANCE/GB，2017-11-14 到 2018-06-14）
+**Source**: Kaggle `thedevastator/youtube-trending-videos-dataset`, `youtube.csv` (161,470 rows, 18 columns, four countries US/CANADA/FRANCE/GB, 2017-11-14 to 2018-06-14)
 
-**验证方式**：全部数字用 DuckDB 直接在原始 CSV 上跑出，可用 `sql/00-invariants.sql` 复现。
+**Verification**: every number below was run directly against the raw CSV with DuckDB, reproducible via `sql/00-invariants.sql`.
 
 ---
 
-## 1. 字段说明纠错：`time_frame`
+## 1. Field description correction: `time_frame`
 
-Kaggle 页面把 `time_frame` 描述为"视频热搜的时间长短"，三条证据证伪：
+The Kaggle page describes `time_frame` as "how long the video trended for". Three pieces of evidence disprove this:
 
-| 证据 | 结果 |
+| Evidence | Result |
 |---|---|
-| 取值形态 | 只有 24 个整点取值（`0:00 to 0:59` 到 `23:00 to 23:59`），是发布钟点 (UTC publish hour)，不是时长 |
-| 同一视频跨行不变 | `NooW_RbfdWI` 在 GB 上榜 38 天、CANADA 6 天、US 10 天、FRANCE 3 天，每个国家内 `time_frame` 只有 1 个值，不随抓取日变化 |
-| 直接反例 | US 榜上 `time_frame='0:00 to 0:59'`（字面意思"不到 1 小时"）的视频里，`XdNOI-q70q4` 连续上榜 22 天，两者不能同时成立 |
+| Value shape | Only 24 clock-hour values (`0:00 to 0:59` through `23:00 to 23:59`) — this is a publish hour (UTC), not a duration |
+| Constant across rows for the same video | `NooW_RbfdWI` trends 38 days in GB, 6 in CANADA, 10 in US, 3 in FRANCE — within each country `time_frame` only takes 1 value, never changing across the scrape |
+| Direct counter-example | Among US-trending videos with `time_frame='0:00 to 0:59'` (literally "under an hour"), `XdNOI-q70q4` actually trended for 22 consecutive days — the two claims can't both be true |
 
-**结论**：`time_frame` 是发布时刻 (publish hour, UTC)，不是持续时长。全表只有 12 个视频（含 `#NAME?`）的 `time_frame` 跨行变化过，排除 `#NAME?` 后是 11 个，这 11 个就是下面"不变量 2"抓到的跨日冲突 ID。
+**Conclusion**: `time_frame` is the publish hour (UTC), not a duration. Across the whole table, only 12 videos (including `#NAME?`) have `time_frame` varying across rows; excluding `#NAME?` leaves 11 — exactly the IDs caught by "Invariant 2" below.
 
-## 2. 违规行清单：两条不变量
+## 2. Violating rows: two data invariants
 
-### 不变量 1：一个视频在一个国家的一天只能有一行
+### Invariant 1: a video can only have one row per country per day
 
-违反这条约束的有 **180 个 distinct video_id，729 个 (video_id, country, day) 分组**。按标题是否相同拆分成两种形态：
+Violating this constraint: **180 distinct video_id, 729 (video_id, country, day) groups**. Split by whether the title matches:
 
-| 违规形态 | ID 数 | 重复组数 | 涉及行数 | 结论 |
+| Violation shape | # of IDs | # of duplicate groups | Rows affected | Conclusion |
 |---|---|---|---|---|
-| `#NAME?` | 1 | 507 | **1,799** | 真正的 ID 冲突，一个坏 ID 挤了几百个不同视频，整体隔离 |
-| 其余 179 个 ID | 179 | 222 | 444（去重后删 222 行）| 同一视频同一天被抓了两次，去重保留一行 |
+| `#NAME?` | 1 | 507 | **1,799** | A genuine ID collision — isolate entirely |
+| The other 179 IDs | 179 | 222 | 444 (222 rows deleted after dedup) | Same video scraped twice on the same day — dedup, keep one row |
 
-`#NAME?` 是 Excel 把以 `-` 或 `=` 开头的 video_id 当公式处理后留下的错误值。
+`#NAME?` is the error value Excel produces when it interprets a video_id starting with `-` or `=` as a formula.
 
-### 不变量 2：一个 video_id 的发布属性（`publish_date`, `time_frame`）必须恒定
+### Invariant 2: a video_id's publish attributes (`publish_date`, `time_frame`) must be constant
 
-不变量 1 只能抓到"同一天撞在一起"的冲突，抓不到"不同视频共用一个 ID 但没在同一天上榜"的情况，所以加这条不变量：
+Invariant 1 only catches violations colliding on the same day; it misses "different videos sharing one ID but never colliding on the same day/country", so a second invariant is needed:
 
-**抓到 11 个 ID，72 行**（必须先排除 `#NAME?`，否则它自己会因发布日期五花八门被误抓进来）。
+**Catches 11 IDs, 72 rows** (must exclude `#NAME?` first, otherwise it would be caught here too due to its wildly inconsistent publish dates).
 
-### 三种形态三种处理
+### Three shapes, three treatments
 
-| 形态 | 处理 | 行数 |
+| Shape | Treatment | Rows |
 |---|---|---|
-| `#NAME?` 同日 ID 冲突 | 整体隔离，无法还原 | 1,799 |
-| 11 个 ID 跨日冲突（发布属性不恒定） | 整体隔离，无法拆回原视频 | 72 |
-| 179 个 ID 同日重复抓取 | 去重，保留 views/likes 最高的一行 | 222 |
+| `#NAME?` same-day ID collision | Isolate entirely, unrecoverable | 1,799 |
+| 11 IDs with inconsistent publish attributes | Isolate entirely, cannot be split back to source videos | 72 |
+| 179 IDs, same-day duplicate scrapes | Dedup, keep the row with highest views/likes | 222 |
 
-三步合计删 **2,093 行**，清洗后 **159,377 行**。
+Total removed: **2,093 rows**, leaving **159,377 rows** after cleaning.
 
-## 3. 抓取完整性
+## 3. Capture completeness
 
-按国家 x 天检查（**必须在清洗、去重之后跑**，重复行会遮住残缺日）：
+Checked by country x day (**must run after cleaning and deduping** — duplicate rows would mask a partial-capture day):
 
-| 国家 | 抓取日数 | 跨度天数 | 单日行数中位数 | 单日最少行数 |
+| Country | Days scraped | Span (days) | Median rows/day | Min rows/day |
 |---|---|---|---|---|
 | CANADA | 205 | 213 | 197 | 169 |
 | FRANCE | 205 | 213 | 197 | 164 |
-| GB | 205 | 213 | 197 | **73**（2018-05-15）|
+| GB | 205 | 213 | 197 | **73** (2018-05-15) |
 | US | 205 | 213 | 198 | 147 |
 
-**四国完全缺失的 8 天完全相同**：2018-01-10, 01-11, 04-08 到 04-13。四国同步缺失说明是上游抓取脚本中断，不是榜单为空。GB 在 2018-05-15 只有 73 行，是一次残缺抓取（不是完全缺失）。
+**All four countries are missing the exact same 8 days**: 2018-01-10, 01-11, 04-08 through 04-13. This synchronized gap across all four independent markets means the upstream scraper went down — it can't be four coincidentally-empty trending lists. GB's 2018-05-15 had only 73 rows — a partial capture, not a full outage.
 
-**结论**：漏抓可以检测，不能修补。跨越缺失日的视频，累计上榜天数会被低估，这一点写进指标口径（`gap_real` vs `gap_scrape` 两列，POC-02 建表时处理）。
+**Conclusion**: a missing scrape can be detected but not repaired. Videos spanning a missing day will have their cumulative trending days undercounted — this is documented explicitly in the metric definitions (`gap_real` vs. `gap_scrape` columns, handled in the table-building step).
 
-## 4. 属性跨行变化（在清洗后数据上计算，避免坏 ID 污染）
+## 4. Attribute drift across rows (computed on cleaned data — avoids contamination from bad IDs)
 
-| 属性 | 跨行变化的视频数 |
+| Attribute | Videos with drift |
 |---|---|
-| `channel_title`（频道改名）| 55 |
-| `title`（改标题）| 538 |
-| `category_id`（改品类）| 49 |
+| `channel_title` (channel renamed) | 55 |
+| `title` (title changed) | 538 |
+| `category_id` (category changed) | 49 |
 
-**结论**：这些视频级属性不能用 `ANY_VALUE` 之类的不确定函数取值，必须用确定性规则（`ARG_MAX(col, trend_dt)`，取末次快照），否则两次运行结果会漂移。
+**Conclusion**: these video-level attributes cannot be pulled with a non-deterministic function like `ANY_VALUE`; they need a deterministic rule (`ARG_MAX(col, trend_dt)`, taking the latest snapshot), otherwise results drift between runs.
 
-## 5. 其他数据质量问题
+## 5. Other data quality issues
 
-| 问题 | 行数 | 说明 |
+| Issue | Rows | Note |
 |---|---|---|
-| `views` 比前一日小（累计值倒退）| 100 | 上游快照顺序或缓存问题，画衰减曲线时负增量按 0 处理 |
-| `video_error_or_removed = True` | 126 | 视频已被删除或报错，指标计算时需要考虑是否剔除 |
-| `channel_title` 仅大小写或空格不同的重复组 | **53**（我验证得到；原设计文档写 52，差 1 属于边界判定的微小差异，如实记录）| 数据没有 `channel_id`，按标题分组会把同一频道错分成多个 |
-| `category_id` 取值范围 | 只有 18 个整数，无名称，需要外部映射表 |
+| `views` smaller than the previous day (cumulative value regressed) | 100 | An upstream snapshot-ordering or caching artifact; negative increments are clipped to 0 when plotting decay curves |
+| `video_error_or_removed = True` | 126 | Video was deleted or errored; needs consideration when computing lifespan/retention metrics |
+| `channel_title` groups differing only by case or whitespace | **53** (verified; original design doc said 52 — a 1-count difference from a minor edge-case judgment call, recorded honestly)| No `channel_id` in the dataset, so grouping by title mis-splits the same channel into multiple entries |
+| `category_id` value range | Only 18 integers, no names — needs an external lookup table |
 
-## 6. 为什么先写不变量再看数据，而不是先看数据再解释
+## 6. Why write the invariants first, then look at the data — not the other way around
 
-如果直接对 `MAX(COUNT(DISTINCT trending_date))` 排序找"最长寿命的视频"，排名前几全是 `video_id='#NAME?'`（FRANCE 191 天，US 188 天）——这是假的，因为 `#NAME?` 是几百个不同视频共用一个 ID 挤出来的虚假计数。
+Sorting naively by `MAX(COUNT(DISTINCT trending_date))` to find "the longest-lived videos" puts `video_id='#NAME?'` at the top (FRANCE 191 days, US 188 days) — a fake number, since `#NAME?` is hundreds of different videos crammed under one ID.
 
-**先写下数据应该满足的业务约束（不变量），再去找违反约束的行**，能把"坏数据造成的假象"和"真实的极端值"分开；反过来先看数据排序再去解释异常值，容易把坏数据的伪影当成真实发现，正如这次如果不写不变量，"191 天最长寿命"就会被错误地当作头条数字写进报告。
+**Writing down the business constraints the data should satisfy (invariants) first, then hunting for rows that violate them**, separates "artifacts caused by bad data" from "genuine extreme values". The reverse order — sorting first, then explaining outliers — risks mistaking an artifact for a real finding, which is exactly what would have happened here if "191-day lifespan" had been reported as a headline number without first writing the invariants.
 
 ---
 
-**产出**：本报告 + `sql/00-invariants.sql`（21 条可独立复现的查询）+ `docs/data-dictionary.md`
+**Deliverables**: this report + `sql/00-invariants.sql` (21 independently reproducible queries) + `docs/data-dictionary.md`
