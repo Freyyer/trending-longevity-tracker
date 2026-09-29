@@ -1,5 +1,7 @@
 # trending-longevity-tracker
 
+![Reconciliation Check](https://github.com/Freyyer/trending-longevity-tracker/actions/workflows/reconcile.yml/badge.svg)
+
 Rebuilding a broken metric from raw YouTube trending-list snapshots, and designing an A/B test for the one lever that looks like it moves the needle.
 
 ## TL;DR
@@ -32,11 +34,17 @@ uv run python -c "import pandas as pd; print(len(pd.read_csv('data/exports/video
 | Directory | Contents |
 |---|---|
 | `sql/` | DuckDB queries: data quality invariants, three-step cleaning, three-layer tables |
-| `src/` | Python pipeline scripts (pandas reconciliation, table building) |
+| `src/` | Python pipeline scripts (pandas reconciliation, table building, channel classification) |
+| `scripts/` | CI helper (`ci_check.py`) — not part of the analysis pipeline itself |
 | `notebooks/` | Hypothesis testing, logistic regression, EDA visualizations |
-| `docs/` | Data quality report, data dictionary, experiment proposal, one-page memo |
+| `docs/` | Data quality report, data dictionary, experiment proposal, memo, creator ecosystem brief |
 | `figures/` | Exported charts (PNG) |
 | `data/` | Small exported CSVs; raw `youtube.csv` is gitignored (download separately) |
+| `.github/workflows/` | CI: dependency + SQL-file checks always; full pipeline reconciliation if Kaggle secrets are configured |
+
+**Why `youtube.csv` isn't committed but `uv.lock` is**: the raw CSV is an 83MB third-party dataset — committing it would bloat the repo with a file anyone can re-download from Kaggle in seconds, and it's not something *this project* produces or owns. `uv.lock` is the opposite: it's small, and it's the one artifact that guarantees a stranger cloning this repo gets the *exact* same dependency versions I used, not "whatever pandas happens to resolve to today." One is a large, reproducible external input; the other is a small, non-reproducible-without-it build artifact.
+
+**Issue-based audit trail**: every finding in `docs/data-quality-report.md` has a corresponding [closed GitHub Issue](https://github.com/Freyyer/trending-longevity-tracker/issues?q=is%3Aissue+is%3Aclosed) with a finding/impact/resolution writeup and a commit reference, rather than just living in a markdown file.
 
 ## The story, in three acts
 
