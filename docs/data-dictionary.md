@@ -69,7 +69,7 @@
 - **True meaning**: the video's **publish hour in UTC** (e.g. `17:00 to 17:59` means published at UTC hour 17) — a publish *moment*, not a duration
 - **Type**: VARCHAR
 - **Value range**: 24 clock-hour bins, from `0:00 to 0:59` to `23:00 to 23:59`
-- **Verification SQL**: see `sql/00-invariants.sql`, Evidence 1-3
+- **Verification SQL**: see `notebooks/01-data-quality-audit.ipynb`, Evidence 1-3 (same queries, run live with real outputs)
 - **Difference from official description**: **the Kaggle page describes it as "how long the video trended for" — this is wrong**. Three pieces of evidence (only 24 clock-hour values, constant across rows for a given video, and a US video with `time_frame='0:00 to 0:59'` that trended for 22 consecutive days) prove it's a publish hour, not a duration. All analysis in this project uses the clearer alias `pub_hour_utc`
 
 ## 9. `published_day_of_week`
@@ -161,4 +161,4 @@
 
 ---
 
-**Deliverables**: this dictionary + `docs/data-quality-report.md` + `sql/00-invariants.sql`
+**Deliverables**: this dictionary + `docs/data-quality-report.md` + `notebooks/01-data-quality-audit.ipynb`

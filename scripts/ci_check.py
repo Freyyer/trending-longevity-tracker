@@ -10,9 +10,10 @@ credentials are configured:
 2. Degraded mode (no credentials): the 80MB raw CSV can't be fetched, so
    this can't run the real pipeline. It instead does what's actually
    possible without the data: verify every dependency imports cleanly,
-   and verify every .sql file is readable, non-empty UTF-8 text. This is
-   weaker than a full run, but it still catches a broken environment or a
-   corrupted file, which is worth having even without the dataset.
+   and verify every .py file in src/ is readable, non-empty UTF-8 text.
+   This is weaker than a full run, but it still catches a broken
+   environment or a corrupted file, which is worth having even without
+   the dataset.
 
 Usage: uv run python scripts/ci_check.py
 """
@@ -68,9 +69,9 @@ def degraded_mode() -> None:
         __import__(mod)
         print(f"OK: import {mod}")
 
-    sql_files = sorted((REPO_ROOT / "sql").glob("*.sql"))
-    assert len(sql_files) > 0, "No .sql files found in sql/"
-    for f in sql_files:
+    py_files = sorted((REPO_ROOT / "src").glob("*.py"))
+    assert len(py_files) > 0, "No .py files found in src/"
+    for f in py_files:
         text = f.read_text(encoding="utf-8")
         assert len(text.strip()) > 0, f"{f.name} is empty"
         print(f"OK: {f.name} is valid non-empty UTF-8 ({len(text)} chars)")

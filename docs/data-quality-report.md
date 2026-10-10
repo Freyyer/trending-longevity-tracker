@@ -2,7 +2,7 @@
 
 **Source**: Kaggle `thedevastator/youtube-trending-videos-dataset`, `youtube.csv` (161,470 rows, 18 columns, four countries US/CANADA/FRANCE/GB, 2017-11-14 to 2018-06-14)
 
-**Verification**: every number below was run directly against the raw CSV with DuckDB, reproducible via `sql/00-invariants.sql`.
+**Verification**: every number below was run directly against the raw CSV with DuckDB, reproducible via `notebooks/01-data-quality-audit.ipynb`.
 
 ---
 
@@ -89,4 +89,4 @@ Sorting naively by `MAX(COUNT(DISTINCT trending_date))` to find "the longest-liv
 
 ---
 
-**Deliverables**: this report + `sql/00-invariants.sql` (21 independently reproducible queries) + `docs/data-dictionary.md`
+**Deliverables**: this report + `notebooks/01-data-quality-audit.ipynb` (21 independently reproducible queries, run live with real outputs) + `docs/data-dictionary.md`
